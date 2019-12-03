@@ -1,5 +1,6 @@
 package main
-// A simple app to save redis databases then flush them
+// A simple app to save redis databases before flushing them
+// this is very destructive
 import (
 	"fmt"
 	"github.com/go-redis/redis"
@@ -19,9 +20,10 @@ func manageRedisNode() {
 	// Test connection
 	pong, err := rdb.Ping().Result()
 	if err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
-	fmt.Println(pong, err)
+	fmt.Println(pong)
 
 	// Get last save in unix time
 	ls := rdb.LastSave()
