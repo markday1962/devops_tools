@@ -43,6 +43,6 @@ func manageRedisNode() {
 	}
 
 	// Flush all redis database on host
-	resp = rdb.FlushAll()
-	fmt.Println(resp)
+	//resp = rdb.FlushAll()
+	//fmt.Println(resp)
 }
