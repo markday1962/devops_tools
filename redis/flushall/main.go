@@ -1,58 +1,48 @@
 package main
-
+// A simple app to save redis databases then flush them
 import (
 	"fmt"
-	"net"
+	"github.com/go-redis/redis"
 	"os"
+	"time"
 )
 
 func main() {
-	checkHostname()
+	manageRedisNode()
 }
 
-func checkIPAddress() {
-	//checks the IP address against the live redis cluster
-	// to prevent the deleation of the production redis db
+func manageRedisNode() {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379", // use default Addr
+	})
 
-	// Get live redis cache ip checkIPAddress
-	ips, err := net.LookupIP("live-pfcache.prod.aistemos.com")
+	// Test connection
+	pong, err := rdb.Ping().Result()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not get IPs: %v\n", err)
 		os.Exit(1)
 	}
-	for _, ip := range ips {
-		fmt.Printf("%s\n", ip.String())
+	fmt.Println(pong, err)
+
+	// Get last save in unix time
+	ls := rdb.LastSave()
+	fmt.Println(ls)
+	resp :=rdb.BgSave()
+	fmt.Println(resp)
+	time.Sleep(2 * time.Second)
+	nls := rdb.LastSave()
+
+	for {
+		if nls != ls {
+			fmt.Println(nls)
+			fmt.Println("Save completed")
+			break
+		}
+		fmt.Println("Waiting for save to complete")
+		time.Sleep(2 * time.Second)
+		nls = rdb.LastSave()
 	}
 
-	// Get local IP address from all interfaces
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		fmt.Printf("Oops: %v\n", err)
-		return
-	}
-	for _, i := range ifaces {
-		addrs, err := i.Addrs()
-		if err != nil {
-			fmt.Printf("Oops: %v\n", err)
-			return
-		}
-		for _, addr := range addrs {
-			var ip net.IP
-			switch v := addr.(type) {
-			case *net.IPNet:
-				ip = v.IP
-			case *net.IPAddr:
-				ip = v.IP
-			}
-			// process IP address
-			fmt.Println(ip)
-		}
-	}
-}
-
-func checkHostname() {
-	host, _ := net.LookupHost("live-pfcache.prod.aistemos.com")
-	fmt.Println(host)
-	cname, _ := net.LookupCNAME("live-pfcache.prod.aistemos.com")
-	fmt.Println(cname)
+	// Flush all redis database on host
+	resp = rdb.FlushAll()
+	fmt.Println(resp)
 }
