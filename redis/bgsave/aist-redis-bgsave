@@ -1,0 +1,9 @@
+# Perfoms a bgsave on the redis database
+#!/bin/bash
+# Version 1.0.0
+SHELL=/bin/bash
+MAILTO="ops@aistemos.com"
+EMAIL="ops@aistemos.com"
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+30 4 * * * root /mnt/data/cipher_backups/aist-bgsave
