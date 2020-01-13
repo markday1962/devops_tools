@@ -4,8 +4,6 @@ package main
 import (
 	"fmt"
 	"github.com/go-redis/redis"
-	_"io/ioutil"
-	_"net/http"
 	"os"
 	"time"
 )
