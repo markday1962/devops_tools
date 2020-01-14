@@ -1,1 +1,2 @@
-env GOOS=linux GOARCH=amd64 go build -v main.go
+#!/usr/bin/env bash
+env GOOS=linux GOARCH=amd64 go build -o bgsave -v main.go
