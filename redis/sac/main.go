@@ -16,11 +16,21 @@ import (
 )
 
 func main() {
+	if len(os.Args) != 2 {
+		usage()
+	}
 	saveRedis()
 	host := os.Args[1]
 	fp := findFile("/mnt", "dump.rdb")
 	copyFile(host, fp)
 
+}
+
+func usage(){
+	fmt.Println("Incorrect usage:")
+	fmt.Println("sac <s3 key>\nsac redis-s3-folder")
+	fmt.Println("Exiting...")
+	os.Exit(1)
 }
 
 func saveRedis() {
@@ -100,13 +110,14 @@ func copyFile(host string, fp string) {
 	svc := s3.New(makeSession())
 	bucket := "aistemos-data-backups"
 	copySource := fp
-	key := "/redis/" + host + "/" + "dump-postetl.rdb"
-	fmt.Printf("Copying %v to %v\n", fp, bucket + key)
+	dt := time.Now().Format("20060102")
+	key := "/redis/" + host + "/" + "dump.rdb-" + dt
+	fmt.Printf("Copying %v to %v\n", fp, key)
 
 	input := &s3.CopyObjectInput{
 		Bucket: aws.String(bucket),
 		CopySource: aws.String(copySource),
-		Key: aws.String(key),
+		Key: aws.String("test"),
 	}
 
 	result, err := svc.CopyObject(input)
