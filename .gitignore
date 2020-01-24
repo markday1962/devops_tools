@@ -2,3 +2,4 @@ elasticsearch/.DS_Store
 linos/.DS_Store
 .idea/
 .DS_Store
+Gopkg.lock
