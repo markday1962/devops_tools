@@ -6,7 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	_ "github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/go-redis/redis"
 	"log/syslog"
 	"os"
@@ -16,19 +16,22 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
+	if len(os.Args) != 4 {
 		usage()
 	}
 	saveRedis()
-	host := os.Args[1]
-	fp := findFile("/mnt", "dump.rdb")
-	copyFile(host, fp)
+	bucket := os.Args[1]
+	prekey := os.Args[2]
+	f := os.Args[3]
+	fp := findFile("/mnt", f)
+
+	copyFile(bucket, prekey, fp, f)
 
 }
 
 func usage(){
 	fmt.Println("Incorrect usage:")
-	fmt.Println("sac <s3 key>\nsac redis-s3-folder")
+	fmt.Println("sac <bucket> <prefix> <file-to-upload>\nsac aistemos-data-backups redis/devcipher-data dump.rdb")
 	fmt.Println("Exiting...")
 	os.Exit(1)
 }
@@ -105,40 +108,44 @@ func saveRedis() {
 	}
 }
 
-func copyFile(host string, fp string) {
-	//copies the dump.rdb to s3
-	svc := s3.New(makeSession())
-	bucket := "aistemos-data-backups"
-	copySource := fp
-	dt := time.Now().Format("20060102")
-	key := "/redis/" + host + "/" + "dump.rdb-" + dt
-	fmt.Printf("Copying %v to %v\n", fp, key)
-
-	input := &s3.CopyObjectInput{
-		Bucket: aws.String(bucket),
-		CopySource: aws.String(copySource),
-		Key: aws.String("test"),
-	}
-
-	result, err := svc.CopyObject(input)
+func copyFile(bucket string, prekey string, fp string, f string) {
+	// Copy file to S3
+	fmt.Printf("Printing file path %v \n", fp)
+	os.Chdir(fp)
+	file, err := os.Open(fp)
 	if err != nil {
-		fmt.Printf(err.Error())
+		fmt.Printf("Unable to open file: %v\n", err)
+		os.Exit(1)
 	}
-	fmt.Println(result)
-}
+	fileInfo, _ := file.Stat()
+	size := fileInfo.Size()
+	buffer := make([]byte, size)
+	file.Read(buffer)
 
-func makeSession() *session.Session {
-	// Specify profile to load for the session's config
+	defer file.Close()
 
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String("eu-west-2"),
+		Region: aws.String("eu-west-2")},
+	)
+	uploader := s3manager.NewUploader(sess)
+
+	t := time.Now()
+	dt := t.Format("20060102")
+	key := "/" + prekey + "/" + f + "-" + dt
+
+	_, err = uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(bucket),
+		Key: aws.String(key),
+		Body: file,
 	})
 	if err != nil {
-		fmt.Println("failed to create session,", err)
-		fmt.Println(err)
-		os.Exit(2)
+		// Print the error and exit.
+		fmt.Printf("Unable to upload %q to %q, %v\n", fp, bucket, err)
+		os.Exit(1)
 	}
-	return sess
+
+	fmt.Printf("Successfully uploaded %q to %q\n", fp, bucket + key)
+
 }
 
 func findFile(rootDir string, dumpFile string) string {
@@ -157,4 +164,3 @@ func findFile(rootDir string, dumpFile string) string {
 	})
 	return fpath
 }
-
