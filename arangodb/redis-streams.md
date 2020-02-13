@@ -1,4 +1,6 @@
+# Redis Streams
 ## Redis Streams Overview
+
 Redis Streams is a sophisticated feature. But you can make sense of it by understanding
 the following main ideas--
 * Redis Streams is essentially a new Redis data structure. 
