@@ -28,7 +28,7 @@ that contains the first number in the sequence, that is 0.
 XADD numbers * n 0
 ```
 We've called XADD with several arguments,
-* numbers, is the name of the key at which the stream is stored. The name of the stream's key is the contract
+* `numbers`, is the name of the key at which the stream is stored. The name of the stream's key is the contract
 between your stream's producers and consumers. And it is implicitly created if it doesn't exist,
 like all other Redis data structures. Note that `XADD` is a single key command, so a message is always
 added to a single stream.
