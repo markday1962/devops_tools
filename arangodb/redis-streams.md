@@ -2,13 +2,13 @@
 
 Redis Streams is a sophisticated feature. But you can make sense of it by understanding
 the following main ideas--
-* First, Redis Streams is essentially a new Redis data structure. 
+* Redis Streams is essentially a new Redis data structure. 
 This data structure is known as a stream.
-* Second, the stream behaves like an append-only list or log.
-* Third, each entry in a stream is structured as a set of key value pairs.  So you can 
+* The stream behaves like an append-only list or log.
+* Each entry in a stream is structured as a set of key value pairs.  So you can 
 think of a stream entry as something akin to a Redis hash.
-* Fourth, every stream entry has a unique ID. And by default, these IDs are time-prefixed.
-* Fifth, streams support ID-based range queries.
+* Every stream entry has a unique ID. And by default, these IDs are time-prefixed.
+* Streams support ID-based range queries.
 * Finally, streams can be consumed and processed by multiple distinct sets of consumers. 
 These are known as consumer groups.
 
@@ -28,20 +28,20 @@ that contains the first number in the sequence, that is 0.
 XADD numbers * n 0
 ```
 We've called XADD with several arguments,
-* 1 numbers, is the name of the key at which the stream is stored. The name of the stream's key is the contract
+* numbers, is the name of the key at which the stream is stored. The name of the stream's key is the contract
 between your stream's producers and consumers. And it is implicitly created if it doesn't exist,
 like all other Redis data structures. Note that `XADD` is a single key command, so a message is always
 added to a single stream.
-* 2 The second argument to `XADD` is the new message's ID. In most cases, we want Redis to 
+* The second argument to `XADD` is the new message's ID. In most cases, we want Redis to 
 manage the generation of message IDs. In fact, one of the compelling reasons to use a stream 
 is for its inherent ordering of messages, which is achieved by having Redis manage it.
 By setting the ID argument to an asterisk, as in our example, we let Redis generate the ID for the new message.
-* 3 The remainder of the arguments are the actual data. They are provided as pairs of field names 
+* The remainder of the arguments are the actual data. They are provided as pairs of field names 
 and their values, exactly like how `HSET` is used with Redis' hashes. 
 And just like Redis' hashes, every value and field name in the message is a Redis string.
 A Redis string can store up to half a gigabyte of binary-safe data if needed, although messages usually
 tend to be much shorter.
-* 4 The automatic generation of IDs  guarantees their uniqueness. And the order of arrival 
+* The automatic generation of IDs  guarantees their uniqueness. And the order of arrival 
 of messages determines their position in the stream.
 
 ### The Message Identifier
