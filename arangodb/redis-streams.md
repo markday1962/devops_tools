@@ -11,7 +11,8 @@ think of a stream entry as something akin to a Redis hash.
 * Finally, streams can be consumed and processed by multiple distinct sets of consumers. 
 These are known as consumer groups.
 
-## The Redis Stream Producer
+## The Producer
+### The Redis Stream Producer
 The producer API allows a producer to append an arbitrary message to a Redis stream.
 The Redis stream producer interface is made up of a single command, XADD,
 that the producer calls with the explicit name of the stream. That is, the key's name, 
@@ -21,7 +22,7 @@ To make the producer extremely simple to reason about, our stream's data will be
 sequence of natural numbers as defined by ISO 80000-2. These are all the numbers beginning 
 with 0 that correspond to the non-negative integers 0, 1, 2, and so forth. 
 To start the stream, the producer will add a message with a single field. Let's call it "n", 
-that contains the first numberin the sequence, that is 0.
+that contains the first number in the sequence, that is 0. 
 ```
 XADD numbers * n 0
 ```
@@ -39,6 +40,10 @@ and their values, exactly like how `HSET` is used with Redis' hashes.
 And just like Redis' hashes, every value and field name in the message is a Redis string.
 A Redis string can store up to half a gigabyte of binary-safe data if needed, although messages usually
 tend to be much shorter.
+* 4 The automatic generation of IDs  guarantees their uniqueness. And the order of arrival 
+of messages determines their position in the stream.
+
+### The Message Identifier
 
 ## Advanced Consumer Management
 It's always possible for a consumer to receive a messageand then go offline before the 
