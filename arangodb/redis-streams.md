@@ -23,7 +23,10 @@ To make the producer extremely simple to reason about, our stream's data will be
 sequence of natural numbers as defined by ISO 80000-2. These are all the numbers beginning 
 with 0 that correspond to the non-negative integers 0, 1, 2, and so forth. 
 To start the stream, the producer will add a message with a single field. Let's call it "n", 
-that contains the first number in the sequence, that is 0. 
+that contains the first number in the sequence, that is 0.
+
+https://redis.io/commands/xinfo
+
 ```
 XADD numbers * n 0
 ```
