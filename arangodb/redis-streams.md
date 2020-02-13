@@ -25,7 +25,7 @@ with 0 that correspond to the non-negative integers 0, 1, 2, and so forth.
 To start the stream, the producer will add a message with a single field. Let's call it "n", 
 that contains the first number in the sequence, that is 0.
 
-https://redis.io/commands/xinfo
+https://redis.io/commands/xadd
 
 ```
 XADD numbers * n 0
