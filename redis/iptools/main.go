@@ -8,6 +8,7 @@ import (
 
 func main() {
 	checkHostname()
+	checkIPAddress()
 }
 
 func checkIPAddress() {

@@ -1,0 +1,6 @@
+#!/bin/bash
+MAILTO="mark.day@aistemos.com"
+EMAIL="ops@aistemos.com"
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Runs every day monday to friday to backup the cipher configs
+00 05 * * MON-FRI root /usr/local/bin/aistemos/backup-configs.sh aistemos-cloud-init swarm-config/drill-test
