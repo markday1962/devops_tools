@@ -1,5 +1,4 @@
 ## Redis Streams Overview
-
 Redis Streams is a sophisticated feature. But you can make sense of it by understanding
 the following main ideas--
 * Redis Streams is essentially a new Redis data structure. 
@@ -35,7 +34,7 @@ added to a single stream.
 * The second argument to `XADD` is the new message's ID. In most cases, we want Redis to 
 manage the generation of message IDs. In fact, one of the compelling reasons to use a stream 
 is for its inherent ordering of messages, which is achieved by having Redis manage it.
-By setting the ID argument to an asterisk, as in our example, we let Redis generate the ID for the new message.
+By setting the ID argument to an `asterisk`, as in our example, we let Redis generate the ID for the new message.
 * The remainder of the arguments are the actual data. They are provided as pairs of field names 
 and their values, exactly like how `HSET` is used with Redis' hashes. 
 And just like Redis' hashes, every value and field name in the message is a Redis string.
@@ -58,7 +57,9 @@ XINFO and XPENDING allows for the examination of pending messages on a stream.
 XCLAIM allows for the reassignment of messages
 
 https://redis.io/commands/xinfo
+
 https://redis.io/commands/xpending
+
 https://redis.io/commands/xclaim
 
 Creating a group called evens that starts at the beginning of the stream.
