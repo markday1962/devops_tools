@@ -1,0 +1,224 @@
+Description
+For this exercise, we’ll look at some example Python code that demonstrates two stream memory management techniques presented in this week's material:
+
+Time-based partitioning with expiry, to manage a potentially never ending stream whose rate of growth may change over time.
+Trimming with XADD to maintain a stream at a constant length as new messages are added to it.
+Imagine we have a device that generates a new temperature reading every second. More of these devices could be added to the system in future, in which case we would expect to receive several readings per second. The readings are used to calculate hourly average temperatures, which are displayed on a dashboard and stored in a data warehouse. There is no requirement for long-term storage of the raw temperature readings in Redis Streams.
+
+Stream Implementation Choices
+Our example implementation uses two data streams:
+
+An incoming stream of raw temperature readings. These will arrive at one-second intervals from each producer. There could potentially be many producers. The data is important, but does not need to be kept forever.
+A stream of hourly average temperature values, calculated from data in the raw temperature readings stream. There will always be one value calculated and placed into this stream for every hour of raw temperature data gathered, no matter how many producers are generating readings. We’d like to always have about five days worth of hourly average temperature data available in the stream.
+For the raw temperature readings, we’ll use a time-partitioned stream with expiry strategy as follows:
+
+Every day, a new stream will be created and named temps:YYYYMMDD. For example a stream for the 1st of January 2025 would be called temps:20250101.
+Each time a new entry is written to the stream, the stream's expiry time is extended two days into the future from the time of the message that was written.
+With this approach, our data set is represented as a rolling set of streams where the oldest expire automatically to be replaced by new ones.
+Implementing this strategy will require both the producer and consumer code bases to understand the stream naming strategy.
+For the hourly average temperature values, we'll use a single stream whose length is capped as new messages are placed onto the stream. This strategy need only be implemented in the producer code base, as the stream's length can be trimmed using the MAXLEN modifier to the XADD command.
+
+Code
+The code is contained in two Python files, both in the folder ru202/src/python/week4.
+
+partitioned_stream_producer.py contains the producer code which will generate a sample temperature data set across a number of stream partitions.
+
+stream_consumers.py contains code for two consumer processes:
+
+The aggregating consumer: This process reads from the partitioned streams of temperature data and calculates hourly averages. It then acts as a producer, placing the hourly averages on another stream whose length is capped with XADD.
+The averages consumer: This process simply reads from the hourly averages stream and displays values from the messages in it.
+Environment
+You can run this in your virtual lab environment or locally. Before each run, the producer code will reset all streams and other Redis keys that the code references. This example code uses the Python Redis Client to connect to Redis and issue commands.
+
+11.3 Running the Producer
+ Bookmark this page
+Using one of the terminal windows in your lab environment, start the producer:
+
+cd ru202/src/python/week4
+python partitioned_stream_producer.py
+You should see the output similar to the following, which may take a few minutes to generate:
+
+$ python partitioned_stream_producer.py
+Deleting old streams:
+temps:20250101
+temps:20250102
+temps:20250103
+temps:20250104
+temps:20250105
+temps:20250106
+temps:20250107
+temps:20250108
+temps:20250109
+temps:20250110
+Populating stream partition temps:20250101.
+Populating stream partition temps:20250102.
+Populating stream partition temps:20250103.
+Populating stream partition temps:20250104.
+Populating stream partition temps:20250105.
+Populating stream partition temps:20250106.
+Populating stream partition temps:20250107.
+Populating stream partition temps:20250108.
+Populating stream partition temps:20250109.
+Populating stream partition temps:20250110.
+What’s happening here? The producer code simulates the generation of temperature values at a rate of one per second. Rather than producing data in real time, the producer operates by assuming that the date is January 1st 2025 at midnight UTC. It then runs as fast as it can to produce ten days' worth of temperature data at one-second intervals. Each day's data is written to a new stream named temps:20250101, temps:20250102... temps:20250110.
+
+As the producer writes each entry to the stream, it sets the expiry date for the stream's key to be 2 days later than the timestamp of the entry written. This ensures that the overall memory required to store the dataset does not grow out of control. Also, if the producer unexpectedly crashes, it will never leave a partly finished stream partition without an expiry time. Eventually, older stream partitions will expire from Redis, making room for the continuous daily generation of new ones.
+
+Note: you can re-run the producer at any time, and it will destroy and re-create the set of partitioned streams.
+
+11.4 Inspecting the Dataset
+Let's verify that the producer created all the data, and set the expiry times on the streams.
+
+Using the terminal, start redis-cli then we'll look at the lengths, expiry times, and contents of the stream partitions that were created.
+
+1. Checking Stream Lengths
+First, check the number of messages that the producer put into each day's stream partition:
+
+$ redis-cli
+127.0.0.1:6379> XLEN temps:20250101
+(integer) 86400
+Here we see that the stream contains 86,400 messages (one for every second of the day). All 10 stream partitions that were created should contain the same number of messages. You can verify this by running the XLEN command for another partition, for example temps:20250103.
+
+2. Checking Stream Expiry
+Next, check how long each stream partition has left until it expires:
+
+127.0.0.1:6379> TTL temps:20250101
+(integer) 178787320
+127.0.0.1:6379> TTL temps:20250102
+(integer) 178873689
+You should notice that temps:20250101 has the shortest time to expiry (because it contains the oldest data), and temps:20250110 the longest (because it contains the newest data).
+
+The TTLs on these keys are very large as our scenario assumes we started writing data on January 1st 2025. This means that the stream that we finished writing at the end of January 1st 2025 won't expire until the beginning of January 4th 2025.
+
+3. Looking at the Messages
+Finally, let's see what the messages look like using XRANGE:
+
+127.0.0.1:6379> XRANGE temps:20250105 - + COUNT 2
+1) 1) "1736035200-0"
+   2) 1) "temp_f"
+      2) "73"
+2) 1) "1736035201-0"
+   2) 1) "temp_f"
+      2) "72"
+Each message's ID is the timestamp that the temperature reading is for (1736035200 = January 5th 2025 at 00:00 for example). The payload is a single item named temp_f whose value is the temperature reading in Fahrenheit.
+
+11.5 Running the Consumers
+ Bookmark this page
+The two consumer processes are both contained in the same file stream_consumers.py.
+
+Start them both using a single command in one of your lab environment's terminal sessions:
+
+cd ru202/src/python/week4
+python stream_consumers.py temps:20250101
+We pass in the parameter temps:20250101 to tell the aggregating consumer where to start from, as it needs to be seeded with an initial stream partition name.
+
+You should see the output similar to the following:
+
+agg: Starting aggregating consumer in stream temps:20250101 at message 0.
+avg: Average temperature for 2025/01/01 at 0 was 23F (3600 observations).
+avg: Average temperature for 2025/01/01 at 1 was 51F (3600 observations).
+avg: Average temperature for 2025/01/01 at 2 was 84F (3600 observations).
+avg: Average temperature for 2025/01/01 at 3 was 73F (3600 observations).
+...
+avg: Average temperature for 2025/01/01 at 21 was 61F (3600 observations).
+avg: Average temperature for 2025/01/01 at 22 was 54F (3600 observations).
+avg: Waiting for new messages in stream temps:averages
+agg: Changing partition to consume stream: temps:20250102
+avg: Average temperature for 2025/01/01 at 23 was 63F (3600 observations).
+avg: Average temperature for 2025/01/02 at 0 was 80F (3600 observations).
+...
+Output from the aggregating consumer appears on lines beginning with agg. Output from the averages consumer appears on lines beginning avg and is colored yellow in your terminal.
+
+Allow the consumers to run for long enough to process all of the data, which may take some time. Once they have done so, they will wait in a blocking loop, which looks like this:
+
+avg: Waiting for new messages in stream temps:averages
+agg: Waiting for new messages in stream temps:20250110, or new stream partition.
+You can then stop the consumers with Ctrl + C.
+
+Let's look at what both of these processes are doing in more detail.
+
+The Aggregating Consumer
+This consumer reads from the stream partitions that the producer created. Its job is to calculate the average temperature for each hour then place a message containing that information into a second stream called temps:averages. It initially needs to know which stream partition containing raw temperature data to begin from, and that is provided via command line arguments when starting the script.
+
+Once it has processed all the messages in its initial stream partition, the consumer blocks and waits for one of two things to happen:
+
+
+More messages to appear in the stream (meaning there are more readings for the day that it is currently processing).
+
+
+OR
+A new stream partition for the next day becomes available, in which case it knows that it has finished processing the current day's stream and should attach to the one for the next day and process that. The consumer's implementation understands the stream naming convention that the producer uses for partitioning the data, so it knows for example that once all the data in temps:20250101 has been processed, it should start processing data in temps:20250102 when that becomes available.
+
+
+
+The average temperature for an hour is calculated by looking at the timestamp IDs of the messages in the stream, and totaling up the temperature values in the message payloads until a timestamp representing the next hour is seen. Once the average for an hour has been calculated, it is placed on the temps:averages stream. The length of the temp:averages stream is also capped at this point using the MAXLEN modifier to XADD.
+
+The aggregating consumer uses also uses Redis to store its state, in case it crashes or is stopped and needs to resume.
+
+The Averages Consumer
+The second consumer is similar to those we have seen in previous hands-on exercises. It simply uses blocking XREAD calls to read anything that is placed on the temps:averages stream, outputting the contents of the messages to the console. So that it can be more easily distinguished from the aggregating consumer's output, the averages consumer logs appear in yellow.
+
+This consumer also uses Redis to store its state in case of a crash.
+
+11.6 Recovering a Crashed Consumer
+ Bookmark this page
+Both of the consumers in our application use XREAD to get new messages from their streams. When using XREAD, the consumer needs to remember the last ID that it received in a response from Redis, then re-use that ID in subsequent calls to XREAD to get the next message.
+
+As our averages consumer simply reads messages and prints data from their payloads, it only needs to store the last message ID received between calls to XREAD.
+
+The aggregating consumer needs to store a few items to maintain state between calls to XREAD:
+
+The last message ID that is received.
+The name of the stream it is reading from. This is required as it is working through a set of streams, each representing a time partition of the overall dataset. The stream name changes over time.
+The current sum of all temperatures read for the hour it is working on.
+The number of messages seen for that hour.
+Once it reaches the end of the hour, it then simply divides the sum of all temperatures seen for the hour by the number of messages seen to get an average value. If the consumer crashes, it needs to be able to recover state when re-starting, so that it can resume reading the stream partition it was working on in the right position with the same working values for calculating the hourly average.
+
+Both consumers in the application use Redis to persist their state to a hash every time they read a message from a stream. This ensures that if the consumer crashes and comes back up, it can resume processing from where it left off.
+
+Let's try this out by restarting the consumer processes while they are working, so that we can see how they recover.
+
+Start the consumers from the beginning of the dataset again:
+
+python stream_consumers.py temps:20250101
+You should see consumption starting from the beginning of temps:20250101:
+
+$ python stream_consumers.py temps:20250101
+agg: Starting aggregating consumer in stream temps:20250101 at message 0.
+avg: Starting averages consumer in stream temps:averages at message 0.
+avg: Average temperature for 2025/01/01 at 0 was 41F (3600 observations).
+avg: Average temperature for 2025/01/01 at 1 was 64F (3600 observations).
+avg: Average temperature for 2025/01/01 at 2 was 83F (3600 observations).
+After the consumers have produced two to three hourly average messages, simulate a crash by stopping them with Ctrl+C.
+
+Before re-starting the consumers, let's use redis-cli to take a look at their stored state beginning with the aggregating consumer:
+
+127.0.0.1:6379> HGETALL aggregating_consumer_state
+1) "current_stream_key"
+2) "temps:20250101"
+3) "last_message_id"
+4) "1735702767-0"
+5) "current_hourly_total"
+6) "61857"
+7) "current_hourly_count"
+8) "2368"
+As we see, the aggregating consumer's stored stage includes the name of the stream partition it was working on, the ID of the last message that it read and the other items required to resume calculating the hourly average when execution restarts.
+
+We can also look at the stored state for the averages consumer, which only needs to store the last message ID for the temps:averages stream that it reads:
+
+127.0.0.1:6379> HGETALL averages_consumer_state
+1) "last_message_id"
+2) "1557107738024-0"
+Next, restart the consumers, this time without specifying a stream partition name at the command line:
+
+python stream_consumers.py
+This starts the consumers from their previously saved states. You should see work continue from where it left off, in this case from message 1735702767-0 in hour 3 of the 1st of January 2025:
+
+$ python stream_consumers.py
+agg: Starting aggregating consumer in stream temps:20250101 at message 1735702767-0.
+avg: Starting averages consumer in stream temps:averages at message 1557107738024-0.
+avg: Average temperature for 2025/01/01 at 3 was 25F (3600 observations).
+avg: Average temperature for 2025/01/01 at 4 was 64F (3600 observations).
+…
+Similarly, the averages consumer restarts from where it left off in the temps:averages stream, and won't report any results that it had already seen.
+
