@@ -35,3 +35,5 @@ Question: You have a stream containing audio recordings and a cluster of microse
 You want to share out this work, processing 100 messages at a time, and you don't know in advance how long it will take to process each message.
 The audio recordings in the messages are completely independent from each other, so can be processed in any order. Which is the best stream consumption strategy for this use case?
 
+Answer: The use case presented here describes the out-of-order processing of a stream. We're sending messages off to a microservice to be processed, but we don't necessarily know when each message will complete.
+Using a consumer group, we can read 100 messages at a time and then acknowledge them one by one using XACK.
