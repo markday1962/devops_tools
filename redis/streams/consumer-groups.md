@@ -241,6 +241,132 @@ To avoid the loss of pending messages, the consumer first reads its history of p
 This provides us with at-least-once message delivery semantics.
 
 
-## Consumer Group Managerment
+## Basic Consumer Group Managerment
+But how do you manage consumer groups in the longer term? Let's start to answer that question by looking at some important consumer group administration
+tasks.
+
+* First, we'll learn how to change a consumer group's position in the stream.
+* Second, we'll learn how to delete a consumer group. 
+* Third, we'll learn how to remove an individual consumer from a consumer group, and some of the important considerationssurrounding this.
+
+To illustrate these operations, let's go back to our natural numbers stream and create a few groups. First, we'll create a group called
+"primes" that starts at the end of the stream.
+
+```
+XGROUP CREATE numbers primes $
+```
+
+Next, we'll create a group called "sums" that starts at ID 0, or the beginning of the stream.
+
+```
+XGROUP CREATE numbers sums 0
+```
+
+Finally, let's create another group called "averages" that also starts at the beginning of the stream.
+
+```
+XGROUP CREATE numbers sums 0
+```
+
+We'll also create a few consumers for the averages group. 
+
+```
+XREADGROUP GROUP averages A COUNT 2 STREAMS numbers >
+XREADGROUP GROUP averages B COUNT 1 STREAMS numbers >
+XACK numbers averages <message-id>
+XREADGROUP GROUP averages C COUNT 1 STREAMS numbers >
+XACK numbers averages <message-id>
+```
+
+Consumer "A" has consumed two messages without acknowledging them. Consumers "B" and "C" have both consumed a single message,
+and have acknowledged that message. Now, we need to talk about changing a consumer group's position.
+
+The primes consumer group is currently at the end of the stream, while the sums and averages consumer
+groups are at the beginning. We can confirm this by running a couple of `XINFO` commands.
+
+```
+XINFO GROUPS numbers
+```
+
+When we run XINFO GROUPS, we can see the last delivered ID for each consumer group. For primes, it's a very specific ID.
+In fact, when we run `XINFO STREAM numbers`, we see that the last entry ID is the same as the primes consumer group's last delivered ID.
+
+```
+XINFO STREAM numbers
+```
+
+So the upshot is that consumer groups always have a specific position in the stream that's dictated by their last entry ID.
+When consuming a stream, the consumers in a group will receive messages whose IDs start after the last entry ID.
+So if we want to change a consumer's position in the stream, we need to alter this last entry ID. For that, we can use `XGROUP SETID` sub-command.
+
+For example, suppose we eventually decide that we want the primes consumer group to start reading from the beginning of the stream
+instead of from the end. We simply run this command. 
+
+```
+XGROUP SETID numbers primes 0
+```
+
+If we want to position the group at an arbitrary ID, we can do that too.
+
+```
+XGROUP SETID numbers primes <message-id>
+```
+
+Or we can place the consumption back at the end of the stream using the special dollar sign ID.
+
+```
+XGROUP SETID numbers primes $
+```
+
+The use cases here should be obvious. Either we want to replay a stream from 
+* the beginning,
+* start consumption from somewhere in the middle -- perhaps at a specific timestamp.
+* start consuming the stream from this moment onward, only processing new messages from here on out.
+
+Now, let's learn how to delete a consumer group. It's first important to remember that Redis does not clean up
+unused consumer groups, so we need a way to clean them up on our own.
+
+Maybe we're done with a particular consumer group, or perhaps we accidentally created it.
+Either way, the `XGROUP DESTROY` command will permanently remove the specified consumer group and any associated consumers, so you
+need to use this command with some care.
+
+Here's how to use it. Suppose we decide we're done with the sums consumer group. We simply run `XGROUP DESTROY`, 
+specifying the stream name and the group name.
+
+```
+XGROUP DESTORY [stream-name] [group-name]
+```
+```
+XGROUP DESTROY numbers sums
+```
+
+Now, in addition to removing entire consumer groups, we can also remove individual consumers from a group.
+There are a number of reasons why we might want to do this. One is that the system running the consumer no longer exists.
+Whatever the reason, consumers themselves are easy to delete. We simply use the `XGROUP DELCONSUMER` command,
+passing in the name of the stream, the name of the group, and the name of the consumer.
+For example, here's how to delete consumer "C" from the averages consumer group.
+
+```
+XGROUP DELCONSUMER [stream-name] [group-name] [consumer-name]
+```
+
+```
+XGROUP DELCONSUMER numbers averages C
+```
+
+This command returns the number of pending entries owned by the deleted consumer.Consumer "C" had zero pending entries.
+That's straightforward, and it's perfectly safe to do when the consumer's pending entries list is empty,
+as in this case. But to delve a bit deeper here, let's take a look at the remaining consumers for the averages
+group. 
+
+```
+XINFO CONSUMERS numbers averages
+```
+
+You'll notice that consumer A has two pending entries. As pending entries, these entries have not been acknowledged by the consumer.
+
+If we delete this consumer, we won't know if they've been processed correctly. This is a potentially common scenario if processes 
+have not been processed correctly then you'll need to assign them elsewhere before deleting the consumer.
+How do you do that? The short answer is that you use a combination of the `XCLAIM`and `XPENDING` commands, 
 
 
