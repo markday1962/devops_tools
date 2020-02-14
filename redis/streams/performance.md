@@ -9,7 +9,7 @@ to remain the same regardless of whether we are adding the first, hundredth, or 
 XADD mystream * hello world
 XADD mystream * hello there
 XADD mystream * hello everybody
-``
+```
 Producers need to be able to add new messages into the stream at rates not affected by the overall length of the stream.
 When reading data from the stream it's also desirable to be able to fetch one or more messages from it with predictable performance,
 ensuring consistent consumer experience regardless of the streams length or the position of the messages in it.
