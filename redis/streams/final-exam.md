@@ -130,3 +130,65 @@ What will the XREAD command return?
 ```
 Only message 5-0 correct
 ```
+
+## Part 3
+* 1 You've created a consumer group called "primes" which reads from the stream "numbers". 
+Each consumer in this group must have a unique name. What is the scope of this uniqueness?
+
+* 2 You have a stream named "numbers" containing 4 messages whose 
+IDs are 1-0, 2-0, 3-0, and 4-0. 
+
+You then create a consumer group as follows:
+```
+XGROUP CREATE numbers primes 0
+```
+Two consumers join the group and read messages:
+```
+XREADGROUP GROUP primes consumer1 COUNT 2 STREAMS numbers >
+XREADGROUP GROUP primes consumer2 COUNT 3 STREAMS numbers >
+```
+Which messages did consumer2 read?
+```
+3-0 and 4-0
+```
+```
+Members of a consumer group work together to process the stream. The consumer group's 
+members will, as a whole, read all messages. An individual consumer in a group will 
+only see a subset of the stream's messages.In this case, consumer1 first reads messages 1-0 and 2-0.
+Next consumer2 reads up to three messages that the consumer group as a whole had not yet 
+processed. Therefore, it receives messages 3-0 and 4-0.
+```
+
+* 3 When consumers read a stream with XREADGROUP, Redis maintains a Pending Entries List. 
+What is the purpose of this list?
+```
+To track messages which have been delivered to a consumer but not yet acknowledged by it
+```
+```
+The Redis server uses a Pending Entries List (PEL) to store the IDs of those messages 
+read by consumers with XREADGROUP, but not yet acknowledged with XACK. 
+This workflow allows messages to be tracked and potentially reassigned in the event that 
+a consumer crashes while processing them.
+
+Using the NOACK subcommand with XREADGROUP will prevent messages from being added to the PEL. 
+In this case, all messages read by consumers will be considered automatically acknowledged 
+regardless of whether the consumer successfully processes them.
+```
+
+* 4 Suppose you run the XPENDING command and see the following output:
+```
+XPENDING numbers primes
+1) (integer) 4
+2) "1-0"
+3) "4-0"
+4) 1) 1) "consumer1"
+      2) "2"
+   2) 1) "consumer2"
+      2) "2"
+```
+You notice that consumer2 has 2 pending messages. 
+Which command will tell you the message IDs of those pending messages without 
+also including the message payload?
+
+
+
